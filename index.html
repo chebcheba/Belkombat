@@ -1,10 +1,8 @@
 <!DOCTYPE html>
-<!-- Created with https://packager.turbowarp.org/ -->
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <!-- We only include this to explicitly loosen the CSP of various packager environments. It does not provide any security. -->
   <meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:">
   <title>xt,</title>
   <style>
@@ -14,6 +12,7 @@
       overflow: hidden;
       margin: 0;
       padding: 0;
+      background-color: #000000;
     }
     :root, body.is-fullscreen {
       background-color: #000000;
@@ -51,6 +50,7 @@
     #launch {
       background-color: rgba(0, 0, 0, 0.7);
       cursor: pointer;
+      z-index: 10;
     }
     .green-flag {
       width: 80px;
@@ -63,9 +63,6 @@
       justify-content: center;
       align-items: center;
       box-sizing: border-box;
-    }
-    #loading {
-      
     }
     .progress-bar-outer {
       border: 1px solid currentColor;
@@ -83,9 +80,6 @@
       font-size: 36px;
       margin: 0 0 16px;
     }
-    .loading-image {
-      margin: 0 0 16px;
-    }
     #error-message, #error-stack {
       font-family: monospace;
       max-width: 600px;
@@ -98,52 +92,14 @@
       max-height: 200px;
       overflow: auto;
     }
-    .control-button {
-      width: 2rem;
-      height: 2rem;
-      padding: 0.375rem;
-      margin-top: 0.5rem;
-      margin-bottom: 0.5rem;
-      user-select: none;
-      -webkit-user-select: none;
-      cursor: pointer;
-      border: 0;
-      border-radius: 4px;
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain; /* Сохраняет пропорции, чтобы картинка не сплющилась */
     }
-    .control-button-highlight:hover {
-      background: #ff4c4c26;
-    }
-    .control-button-highlight.active {
-      background: #ff4c4c59;
-    }
-    .fullscreen-button {
-      background: white;
-    }
-    .standalone-fullscreen-button {
-      position: absolute;
-      top: 0;
-      right: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      border-radius: 0 0 0 4px;
-      padding: 4px;
-      cursor: pointer;
-    }
-    .sc-canvas {
-      cursor: auto;
-    }
-    .sc-monitor-root[data-opcode^="data_"] .sc-monitor-value-color {
-      background-color: #ff8c1a;
-    }
-    .sc-monitor-row-value-outer {
-      background-color: #fc662c;
-    }
-    .sc-monitor-row-value-editing .sc-monitor-row-value-outer {
-      background-color: #e25b27;
-    }
-    
   </style>
   <meta name="theme-color" content="#000000">
-  
 </head>
 <body>
   <div id="app"></div>
@@ -160,8 +116,6 @@
 
   <div id="loading" class="screen">
     <noscript>Enable JavaScript</noscript>
-    
-    
     <div class="progress-bar-outer"><div class="progress-bar-inner" id="loading-inner"></div></div>
   </div>
 
@@ -203,7 +157,8 @@
       const scaffolding = new Scaffolding.Scaffolding();
       scaffolding.width = 480;
       scaffolding.height = 360;
-      scaffolding.resizeMode = "preserve-ratio";
+      // Изменено на stretch для заполнения экрана
+      scaffolding.resizeMode = "stretch"; 
       scaffolding.editableLists = false;
       scaffolding.usePackagedRuntime = true;
       scaffolding.setup();
@@ -230,9 +185,10 @@
       }
 
       vm.setTurboMode(false);
-      if (vm.setInterpolation) vm.setInterpolation(false);
+      if (vm.setInterpolation) vm.setInterpolation(true); // Включено для плавности
       if (vm.setFramerate) vm.setFramerate(30);
-      if (vm.renderer.setUseHighQualityRender) vm.renderer.setUseHighQualityRender(false);
+      // ВКЛЮЧЕНО высокое качество рендера
+      if (vm.renderer.setUseHighQualityRender) vm.renderer.setUseHighQualityRender(true); 
       if (vm.setRuntimeOptions) vm.setRuntimeOptions({
         fencing: true,
         miscLimits: true,
@@ -242,9 +198,10 @@
         enabled: true,
         warpTimer: false
       });
-      if (vm.renderer.setMaxTextureDimension) vm.renderer.setMaxTextureDimension(2048);
+      
+      // Максимальное качество текстур
+      if (vm.renderer.setMaxTextureDimension) vm.renderer.setMaxTextureDimension(4096);
 
-      // enforcePrivacy threat model only makes sense in the editor
       if (vm.runtime.setEnforcePrivacy) vm.runtime.setEnforcePrivacy(false);
 
       if (typeof ScaffoldingAddons !== 'undefined') {
@@ -255,71 +212,55 @@
         getSandboxMode: () => 'unsandboxed',
         canLoadExtensionFromProject: () => true
       });
-      for (const extension of []) {
-        vm.extensionManager.loadExtensionURL(extension);
-      }
 
     } catch (e) {
       handleError(e);
     }
   </script>
   
-  
-    <script>
-      const getProjectData = (function() {
-        const storage = scaffolding.storage;
-        storage.onprogress = (total, loaded) => {
-          setProgress(interpolate(0.2, 0.98, loaded / total));
-        };
-        
-        storage.addWebStore(
-          [
-            storage.AssetType.ImageVector,
-            storage.AssetType.ImageBitmap,
-            storage.AssetType.Sound,
-            storage.AssetType.Font
-          ].filter(i => i),
-          (asset) => new URL('./assets/' + asset.assetId + '.' + asset.dataFormat, location).href
-        );
-        return () => new Promise((resolve, reject) => {
+  <script>
+    const getProjectData = (function() {
+      const storage = scaffolding.storage;
+      storage.onprogress = (total, loaded) => {
+        setProgress(interpolate(0.2, 0.98, loaded / total));
+      };
+      
+      storage.addWebStore(
+        [
+          storage.AssetType.ImageVector,
+          storage.AssetType.ImageBitmap,
+          storage.AssetType.Sound,
+          storage.AssetType.Font
+        ].filter(i => i),
+        (asset) => new URL('./assets/' + asset.assetId + '.' + asset.dataFormat, location).href
+      );
+      return () => new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.onload = () => {
-          resolve(xhr.response);
-        };
-        xhr.onerror = () => {
-          if (location.protocol === 'file:') {
-            reject(new Error('Zip environment must be used on a website, not on a local file. To fix this error, use the "Plain HTML" environment instead.'));
-          } else {
-            reject(new Error('Request to load project data failed.'));
-          }
-        };
+        xhr.onload = () => resolve(xhr.response);
+        xhr.onerror = () => reject(new Error('Request failed.'));
         xhr.onprogress = (e) => {
-          if (e.lengthComputable) {
-            setProgress(interpolate(0.1, 0.2, e.loaded / e.total));
-          }
+          if (e.lengthComputable) setProgress(interpolate(0.1, 0.2, e.loaded / e.total));
         };
         xhr.responseType = 'arraybuffer';
         xhr.open('GET', "./assets/project.json");
         xhr.send();
       });
-      })();
-    </script>
-  <script>
+    })();
+
     const run = async () => {
       const projectData = await getProjectData();
       await scaffolding.loadProject(projectData);
       setProgress(1);
       loadingScreen.hidden = true;
-      if (false) {
+      launchScreen.hidden = false;
+      launchScreen.addEventListener('click', () => {
+        launchScreen.hidden = true;
         scaffolding.start();
-      } else {
-        launchScreen.hidden = false;
-        launchScreen.addEventListener('click', () => {
-          launchScreen.hidden = true;
-          scaffolding.start();
-        });
-        launchScreen.focus();
-      }
+        // Пытаемся вызвать нативный фуллскрин при клике (улучшает опыт на Android)
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+      });
     };
     run().catch(handleError);
   </script>
